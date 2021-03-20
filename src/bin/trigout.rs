@@ -1,26 +1,26 @@
-use trigout::get_args;
+use trigout::{get_args, get_socket_name, get_socket_path};
 
 use std::fs::create_dir;
 use std::path::PathBuf;
 
 use std::io::{BufRead, BufReader};
-use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
 
 const QUIT_CHAR: &str = "q";
 
 /// Read stream and print to stdout
-/// Shutdown the stream if, QUIT_CHAR is read from the stream
-fn handle_client(stream: UnixStream) {
+/// Return true if, QUIT_CHAR is read from the stream
+/// Return false when the stream is closed by client
+fn handle_client(stream: UnixStream) -> bool {
     let reader = BufReader::new(&stream);
     for line in reader.lines() {
         let data = line.unwrap();
         println!("{}", data);
         if data == QUIT_CHAR {
-            break;
+            return true;
         }
     }
-    stream.shutdown(Shutdown::Both).expect("Unable to shutdown");
+    false
 }
 
 fn main() {
@@ -40,14 +40,16 @@ fn main() {
 /// Only ONE client supported
 /// Calls `handle_client()` internally.
 fn listen_to_socket(socket_name: String) {
-    let listener = UnixListener::bind(format!("/tmp/trigout/{}", socket_name));
+    let listener = UnixListener::bind(get_socket_path(socket_name));
     match listener {
         Ok(a) => {
             for stream in a.incoming() {
                 match stream {
                     Ok(stream) => {
-                        handle_client(stream);
-                        break;
+                        // If client sends a QUIT_CHAR, break out of the loop
+                        if handle_client(stream) {
+                            break;
+                        }
                     }
                     Err(err) => {
                         eprintln!("Error: {}", err);
@@ -71,13 +73,4 @@ fn create_socket_dir() -> bool {
         Ok(_a) => true,
         Err(_a) => false,
     }
-}
-
-/// Return the first argument to the program
-/// If no argument is given, "0" is retuned
-fn get_socket_name(args: Vec<String>) -> String {
-    if args.len() < 2 {
-        return "0".to_owned();
-    }
-    return args[1].clone();
 }
