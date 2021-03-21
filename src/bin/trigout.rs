@@ -1,10 +1,10 @@
-use trigout::{get_args, get_socket_name, get_socket_path, write_to_file};
-
 use std::fs::create_dir;
 use std::io::{BufRead, BufReader};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use trigout::format::{get_format_type, FormatType};
+
+use trigout::{get_args, get_socket_name, get_socket_path, write_to_file};
 
 const QUIT_CHAR: &str = "q";
 
@@ -23,7 +23,7 @@ struct Config {
     file: Option<String>,
     format_type: FormatType,
 }
-
+//
 impl Config {
     fn parse_config(args: &Vec<String>) -> Config {
         Config {
@@ -64,7 +64,7 @@ fn create_socket_dir() -> bool {
 /// Listen to "/tmp/trigout/<socket_name>"
 /// Only ONE client supported
 /// Calls `handle_client()` internally.
-fn listen_to_socket(cfg: Config) {
+fn listen_to_socket(mut cfg: Config) {
     let listener = UnixListener::bind(get_socket_path(&cfg.socket_name));
     match listener {
         Ok(a) => {
@@ -72,7 +72,7 @@ fn listen_to_socket(cfg: Config) {
                 match stream {
                     Ok(stream) => {
                         // If client sends a QUIT_CHAR, break out of the loop
-                        if handle_client(stream, &cfg) {
+                        if handle_client(stream, &mut cfg) {
                             break;
                         }
                     }
@@ -89,7 +89,7 @@ fn listen_to_socket(cfg: Config) {
 /// Read stream and print to stdout
 /// Return true if, QUIT_CHAR is read from the stream
 /// Return false when the stream is closed by client
-fn handle_client(stream: UnixStream, cfg: &Config) -> bool {
+fn handle_client(stream: UnixStream, cfg: &mut Config) -> bool {
     let reader = BufReader::new(&stream);
     for line in reader.lines() {
         let data = line.unwrap();
@@ -97,7 +97,7 @@ fn handle_client(stream: UnixStream, cfg: &Config) -> bool {
         if data == QUIT_CHAR {
             return true;
         }
-
+        &cfg.format_type.update_var("date", &data);
         let data = &cfg.format_type.format();
         println!("{}", data);
 
