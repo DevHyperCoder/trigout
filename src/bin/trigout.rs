@@ -1,30 +1,12 @@
-use trigout::{get_args, get_socket_name, get_socket_path};
+use trigout::{get_args, get_socket_name, get_socket_path, write_to_file};
 
 use std::fs::create_dir;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
+use trigout::format::{get_format_type, FormatType};
 
 const QUIT_CHAR: &str = "q";
-
-/// Write `c` to a file at path
-/// Propagates the error message to caller
-fn write_to_file(path: PathBuf, c: &str) -> Result<(), std::io::Error> {
-    // Create file if not exist already
-    // Remove previous content and write to it
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(path);
-
-    match file {
-        Ok(mut f) => f.write_all(format!("{}\n", c).as_bytes()),
-        Err(e) => Err(e),
-    }
-}
 
 /// Return a Option based on the argument vector
 fn get_file_name(args: &[String]) -> Option<String> {
@@ -39,6 +21,7 @@ fn get_file_name(args: &[String]) -> Option<String> {
 struct Config {
     socket_name: String,
     file: Option<String>,
+    format_type: FormatType,
 }
 
 impl Config {
@@ -46,6 +29,7 @@ impl Config {
         Config {
             socket_name: get_socket_name(&args),
             file: get_file_name(&args),
+            format_type: get_format_type(get_socket_name(&args)),
         }
     }
 }
@@ -114,6 +98,7 @@ fn handle_client(stream: UnixStream, cfg: &Config) -> bool {
             return true;
         }
 
+        let data = &cfg.format_type.format();
         println!("{}", data);
 
         if cfg.file.is_some() {
