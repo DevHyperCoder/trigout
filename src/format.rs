@@ -19,7 +19,15 @@ pub struct FormatType {
 
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    vars: HashMap<String, (String, usize, usize)>,
+    vars: HashMap<String, String>,
+
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    vars_key_order_vec: Vec<String>,
+
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    split_str: Vec<String>,
 }
 
 impl FormatType {
@@ -29,6 +37,8 @@ impl FormatType {
             data_file: None,
             format_str: "Hi! Date is {date}. Time is {h}:{m}:{s}".to_owned(),
             vars: HashMap::new(),
+            vars_key_order_vec: vec![],
+            split_str: vec![],
         }
     }
     pub fn update_var(&mut self, var: &str, value: &str) {
@@ -37,11 +47,30 @@ impl FormatType {
         }
         self.vars
             .entry(var.to_owned())
-            .and_modify(|e| e.0 = value.to_owned());
+            .and_modify(|e| *e = value.to_string());
         println!("{:?}", self.vars);
     }
-    pub fn format(&mut self) -> &String {
-        &self.format_str
+    pub fn format(&mut self) -> String {
+        // split the str into vectors based on the tuples, then put the values in it and then return
+        let mut index = 0;
+
+        let mut final_str = String::new();
+        let empty_char = String::new();
+        for i in &self.split_str {
+            final_str += i;
+
+            if &self.vars_key_order_vec.len() == (&index as &usize) {
+                break;
+            }
+            let key = &self.vars_key_order_vec[index];
+
+            let value = &self.vars.get(key).unwrap_or(&empty_char);
+
+            final_str += value;
+
+            index += 1;
+        }
+        final_str
     }
 
     pub fn compile_regex(&mut self) {
@@ -55,13 +84,16 @@ impl FormatType {
             let st = &self.format_str.substring(i.start() + 1, i.end() - 1);
             println!("{}", st);
 
-            &self.vars.insert(
-                st.to_owned().to_string(),
-                ("".to_owned(), i.start(), i.end()),
-            );
+            &self.vars.insert(st.to_owned().to_string(), ("".to_owned()));
+            &self.vars_key_order_vec.push(st.to_owned().to_string());
+        }
+        let str_vec = re.split(&self.format_str).into_iter();
+
+        for i in str_vec {
+            &self.split_str.push(i.to_string());
         }
 
-        println!("{:?}", self.vars);
+        println!("{:?}", &self.split_str);
     }
 }
 
