@@ -97,7 +97,7 @@ fn handle_client(stream: UnixStream, cfg: &mut Config) -> bool {
         if data == QUIT_CHAR {
             return true;
         }
-        &cfg.format_type.update_var("date", &data);
+        cfg.format_type.update_var("date", &data);
         let data = &cfg.format_type.format();
         println!("{}", data);
 

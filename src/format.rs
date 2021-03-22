@@ -4,7 +4,6 @@ use super::write_to_file;
 use substring::Substring;
 
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use std::fs::OpenOptions;
 use std::path::PathBuf;
@@ -84,10 +83,10 @@ impl FormatType {
             let st = &self.format_str.substring(i.start() + 1, i.end() - 1);
             println!("{}", st);
 
-            &self.vars.insert(st.to_owned().to_string(), ("".to_owned()));
-            &self.vars_key_order_vec.push(st.to_owned().to_string());
+            self.vars.insert(st.to_owned().to_string(), "".to_owned());
+            self.vars_key_order_vec.push(st.to_owned().to_string());
         }
-        let str_vec = re.split(&self.format_str).into_iter();
+        let str_vec = re.split(&self.format_str);
 
         for i in str_vec {
             &self.split_str.push(i.to_string());
