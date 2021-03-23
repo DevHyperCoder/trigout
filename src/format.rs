@@ -1,20 +1,18 @@
-//asdf
-use super::write_to_file;
-
-use substring::Substring;
-
+use home::home_dir;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
+use substring::Substring;
 
-use std::collections::HashMap;
+use super::write_to_file;
 
+/// Contain socket name and format_str with necessary maps and vectors.
 #[derive(Serialize, Deserialize)]
 pub struct FormatType {
     pub sock_name: String,
     pub format_str: String,
-    pub data_file: Option<String>,
 
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
@@ -29,17 +27,27 @@ pub struct FormatType {
     split_str: Vec<String>,
 }
 
+impl Default for FormatType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FormatType {
+    /// Populate format_str and sock_name
+    /// sock_name -> 0
+    /// format_str -> "Hi! Date is {date}. Time is {h}:{m}:{s}"
     pub fn new() -> Self {
         FormatType {
             sock_name: "0".to_owned(),
-            data_file: None,
             format_str: "Hi! Date is {date}. Time is {h}:{m}:{s}".to_owned(),
             vars: HashMap::new(),
             vars_key_order_vec: vec![],
             split_str: vec![],
         }
     }
+
+    /// Update given variable name in internal hashmap
     pub fn update_var(&mut self, var: &str, value: &str) {
         if !&self.vars.contains_key(var) {
             return;
@@ -47,15 +55,13 @@ impl FormatType {
         self.vars
             .entry(var.to_owned())
             .and_modify(|e| *e = value.to_string());
-        println!("{:?}", self.vars);
     }
-    pub fn format(&mut self) -> String {
-        // split the str into vectors based on the tuples, then put the values in it and then return
-        let mut index = 0;
 
+    /// Return formatted string
+    pub fn format(&mut self) -> String {
         let mut final_str = String::new();
         let empty_char = String::new();
-        for i in &self.split_str {
+        for (index, i) in self.split_str.iter().enumerate() {
             final_str += i;
 
             if &self.vars_key_order_vec.len() == (&index as &usize) {
@@ -66,22 +72,16 @@ impl FormatType {
             let value = &self.vars.get(key).unwrap_or(&empty_char);
 
             final_str += value;
-
-            index += 1;
         }
         final_str
     }
 
+    /// Compile regex and update the vars map and key order vector, and split string vector
     pub fn compile_regex(&mut self) {
-        use regex::Regex;
-
-        let re = Regex::new(r"\{[a-zA-z0-9]+\}*").unwrap();
+        let re = Regex::new(r"\{[a-zA-Z0-9]+\}*").unwrap();
 
         for i in re.find_iter(&self.format_str) {
-            println!("{:?}", i);
-
             let st = &self.format_str.substring(i.start() + 1, i.end() - 1);
-            println!("{}", st);
 
             self.vars.insert(st.to_owned().to_string(), "".to_owned());
             self.vars_key_order_vec.push(st.to_owned().to_string());
@@ -89,19 +89,18 @@ impl FormatType {
         let str_vec = re.split(&self.format_str);
 
         for i in str_vec {
-            &self.split_str.push(i.to_string());
+            self.split_str.push(i.to_string());
         }
-
-        println!("{:?}", &self.split_str);
     }
 }
 
-pub fn get_format_type(sock_name: String) -> FormatType {
-    let path = PathBuf::new().join("/home/devhypercoder/.config/trigout.json");
+/// Return formatting type for given socket_name
+pub fn get_format_type(sock_name: String) -> Option<FormatType> {
+    let path = home_dir().unwrap().join(".config/trigout.json");
 
     if !path.exists() {
         write_default_config_file(path).unwrap();
-        return FormatType::new();
+        return Some(FormatType::new());
     }
 
     let formats = read_config_file(path).unwrap();
@@ -111,13 +110,10 @@ pub fn get_format_type(sock_name: String) -> FormatType {
             continue;
         }
         format_type.compile_regex();
-        return format_type;
+        return Some(format_type);
     }
 
-    panic!(format!(
-        "Can not find a configuration for socket: {}",
-        sock_name
-    ));
+    None
 }
 
 /// Read from config file and give back a struct
@@ -137,6 +133,7 @@ fn write_default_config_file(path: PathBuf) -> Result<(), std::io::Error> {
     write_to_file(path, &generate_default_config())
 }
 
+/// Return a empty config file
 fn generate_default_config() -> String {
     let format_vec = vec![FormatType::new()];
     serde_json::to_string_pretty(&format_vec).unwrap()

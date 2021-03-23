@@ -2,8 +2,8 @@ use std::fs::create_dir;
 use std::io::{BufRead, BufReader};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
-use trigout::format::{get_format_type, FormatType};
 
+use trigout::format::{get_format_type, FormatType};
 use trigout::{get_args, get_socket_name, get_socket_path, write_to_file};
 
 const QUIT_CHAR: &str = "q";
@@ -23,13 +23,14 @@ struct Config {
     file: Option<String>,
     format_type: FormatType,
 }
-//
+
 impl Config {
-    fn parse_config(args: &Vec<String>) -> Config {
+    fn parse_config(args: &[String]) -> Config {
         Config {
             socket_name: get_socket_name(&args),
             file: get_file_name(&args),
-            format_type: get_format_type(get_socket_name(&args)),
+            format_type: get_format_type(get_socket_name(&args))
+                .expect("Can not find config for given socket name"),
         }
     }
 }
@@ -97,7 +98,10 @@ fn handle_client(stream: UnixStream, cfg: &mut Config) -> bool {
         if data == QUIT_CHAR {
             return true;
         }
-        cfg.format_type.update_var("date", &data);
+
+        let var_val = get_var_val(&data);
+
+        cfg.format_type.update_var(var_val.0, var_val.1);
         let data = &cfg.format_type.format();
         println!("{}", data);
 
@@ -107,4 +111,15 @@ fn handle_client(stream: UnixStream, cfg: &mut Config) -> bool {
         }
     }
     false
+}
+
+/// Return a tuple for a split of data by '='
+fn get_var_val(data: &str) -> (&str, &str) {
+    if !data.contains('=') {
+        return ("", "");
+    }
+
+    let v: Vec<&str> = data.split('=').collect();
+
+    (v[0], v[1])
 }
